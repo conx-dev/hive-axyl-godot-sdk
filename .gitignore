@@ -1,0 +1,7 @@
+.DS_Store
+.godot/
+imported/
+export_presets.cfg
+*.translation
+AGENTS.md
+CLAUDE.md
