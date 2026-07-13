@@ -36,7 +36,8 @@ static func create_hive_axyl(config: Dictionary) -> HiveAxyl:
 
 
 func _init() -> void:
-    auth = AuthApi.new(self)
+    var client_platform := Util.detect_client_platform()
+    auth = AuthApi.new(self, client_platform)
     notice = NoticeApi.new(self)
     mailbox = MailboxApi.new(self)
 
@@ -285,9 +286,17 @@ func _build_headers(method: String, requires_auth: bool) -> PackedStringArray:
     headers.append("Authorization: Bearer " + api_key)
     if not language.is_empty():
         headers.append("X-Hive-Ng-Language: " + language)
-    if _session.has_access_token() and method != "RefreshToken":
+    if _session.has_access_token() and _uses_player_token(method):
         headers.append("X-Player-Token: " + _session.access_token)
     return headers
+
+
+func _uses_player_token(method: String) -> bool:
+    match method:
+        "RefreshToken", "StartFacebookDesktopLogin", "CompleteFacebookDesktopLogin":
+            return false
+        _:
+            return true
 
 
 func _set_http_error(response_code: int, body: String) -> void:

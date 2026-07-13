@@ -3,13 +3,16 @@ extends RefCounted
 
 const Util := preload("res://addons/hive_axyl/hive_axyl_util.gd")
 const GoogleDesktopSignIn := preload("res://addons/hive_axyl/hive_axyl_google_desktop_sign_in.gd")
+const FacebookDesktopSignIn := preload("res://addons/hive_axyl/hive_axyl_facebook_desktop_sign_in.gd")
 
 var hive
+var _client_platform := ""
 var _player := {}
 
 
-func _init(hive_client) -> void:
+func _init(hive_client, client_platform: String) -> void:
     hive = hive_client
+    _client_platform = client_platform
 
 
 func get_login_providers(country_override: String = "") -> Dictionary:
@@ -19,7 +22,7 @@ func get_login_providers(country_override: String = "") -> Dictionary:
         "GetLoginProviders",
         {
             "countryOverride": country_override,
-            "platform": Util.CLIENT_PLATFORM_DESKTOP
+            "platform": _client_platform
         },
         true
     )
@@ -43,7 +46,21 @@ func login_with_google(id_token: String) -> Dictionary:
     return await _login(Util.IDENTITY_PROVIDER_GOOGLE, id_token)
 
 
+func login_with_facebook(access_token: String) -> Dictionary:
+    if access_token.is_empty():
+        hive._set_error(Util.ERROR_INVALID_ARGUMENT, "accessToken is required")
+        return {}
+    return await _login(Util.IDENTITY_PROVIDER_FACEBOOK, access_token)
+
+
 func login_with_google_desktop(client_id: String = "", client_secret: String = "", port: int = 0) -> Dictionary:
+    if not _is_desktop_platform():
+        hive._set_error(
+            Util.ERROR_FAILED_PRECONDITION,
+            "Google desktop sign-in is only available on desktop"
+        )
+        return {}
+
     var resolved_client_id := client_id.strip_edges()
     if resolved_client_id.is_empty():
         resolved_client_id = hive.google_client_id.strip_edges()
@@ -71,6 +88,34 @@ func login_with_google_desktop(client_id: String = "", client_secret: String = "
         return {}
 
     return await login_with_google(str(oauth.get("id_token", "")))
+
+
+func login_with_facebook_desktop(port: int = 0) -> Dictionary:
+    if not _is_desktop_platform():
+        hive._set_error(
+            Util.ERROR_FAILED_PRECONDITION,
+            "Facebook desktop sign-in is only available on desktop"
+        )
+        return {}
+
+    var sign_in := FacebookDesktopSignIn.new()
+    hive.add_child(sign_in)
+    var response = await sign_in.sign_in(hive, port)
+    sign_in.queue_free()
+
+    if typeof(response) != TYPE_DICTIONARY:
+        hive._set_error(Util.ERROR_INTERNAL, "Facebook sign-in failed")
+        return {}
+    if response.is_empty():
+        return {}
+    if response.has("error"):
+        hive._set_error(
+            str(response.get("code", Util.ERROR_INTERNAL)),
+            str(response.get("error", "Facebook sign-in failed")),
+            response.get("metadata", {})
+        )
+        return {}
+    return _save_login(response)
 
 
 func login_as_guest(device_id: String) -> Dictionary:
@@ -139,13 +184,21 @@ func _login(provider: String, provider_token: String) -> Dictionary:
         {
             "provider": provider,
             "providerToken": provider_token,
-            "platform": Util.CLIENT_PLATFORM_DESKTOP
+            "platform": _client_platform
         },
         true
     )
     if typeof(response) != TYPE_DICTIONARY:
         return {}
 
+    return _save_login(response)
+
+
+func _is_desktop_platform() -> bool:
+    return _client_platform == Util.CLIENT_PLATFORM_DESKTOP
+
+
+func _save_login(response: Dictionary) -> Dictionary:
     var token_pair: Dictionary = response.get("tokenPair", {})
     var player_message: Dictionary = response.get("player", {})
     if token_pair.is_empty() or player_message.is_empty():

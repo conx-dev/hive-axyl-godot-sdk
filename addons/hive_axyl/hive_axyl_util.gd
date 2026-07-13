@@ -1,8 +1,12 @@
 class_name HiveAxylUtil
 extends RefCounted
 
+const CLIENT_PLATFORM_WEB := "CLIENT_PLATFORM_WEB"
+const CLIENT_PLATFORM_ANDROID := "CLIENT_PLATFORM_ANDROID"
+const CLIENT_PLATFORM_IOS := "CLIENT_PLATFORM_IOS"
 const CLIENT_PLATFORM_DESKTOP := "CLIENT_PLATFORM_DESKTOP"
 const IDENTITY_PROVIDER_GOOGLE := "IDENTITY_PROVIDER_GOOGLE"
+const IDENTITY_PROVIDER_FACEBOOK := "IDENTITY_PROVIDER_FACEBOOK"
 const IDENTITY_PROVIDER_GUEST := "IDENTITY_PROVIDER_GUEST"
 const ERROR_UNSPECIFIED := "ERROR_CODE_UNSPECIFIED"
 const ERROR_INTERNAL := "ERROR_CODE_INTERNAL"
@@ -50,6 +54,16 @@ const ERROR_CODE_NAMES := {
     601: "ERROR_CODE_MAIL_ALREADY_CLAIMED",
     602: "ERROR_CODE_MAIL_NOT_CLAIMABLE"
 }
+
+
+static func detect_client_platform() -> String:
+    if OS.has_feature("web"):
+        return CLIENT_PLATFORM_WEB
+    if OS.has_feature("android"):
+        return CLIENT_PLATFORM_ANDROID
+    if OS.has_feature("ios"):
+        return CLIENT_PLATFORM_IOS
+    return CLIENT_PLATFORM_DESKTOP
 
 static func trim_trailing_slash(value: String) -> String:
     var next := value.strip_edges()
