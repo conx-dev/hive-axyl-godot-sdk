@@ -168,6 +168,35 @@ func _rpc(domain: String, service: String, method: String, body: Dictionary, all
     )
 
 
+func _post_auth_json(domain: String, path: String, body: Dictionary) -> Variant:
+    if not _ready:
+        _set_error(Util.ERROR_FAILED_PRECONDITION, "HiveAxyl not initialized - call initialize() first")
+        return null
+
+    var base_url := _endpoint_for(domain)
+    if base_url.is_empty():
+        _set_error(Util.ERROR_NOT_FOUND, "discovery returned no endpoint for domain: " + domain)
+        return null
+
+    var request_node := HTTPRequest.new()
+    add_child(request_node)
+    var normalized_path := path
+    if not normalized_path.begins_with("/"):
+        normalized_path = "/" + normalized_path
+    var url := base_url + normalized_path
+    var headers := _build_api_key_headers()
+    var payload := JSON.stringify(body)
+    var error := request_node.request(url, headers, HTTPClient.METHOD_POST, payload)
+    if error != OK:
+        request_node.queue_free()
+        _set_error(Util.ERROR_INTERNAL, "request start failed: " + str(error), {}, 0, true)
+        return null
+
+    var completed: Array = await request_node.request_completed
+    request_node.queue_free()
+    return _parse_json_response(completed, path)
+
+
 func _refresh_session() -> bool:
     if not _session.has_refresh_token():
         return false
@@ -249,6 +278,11 @@ func _send_json_once(
     var completed: Array = await request_node.request_completed
     request_node.queue_free()
 
+    return _parse_json_response(completed, service + "/" + method)
+
+
+func _parse_json_response(completed: Array, operation: String) -> Variant:
+
     var result := int(completed[0])
     var response_code := int(completed[1])
     var response_body: PackedByteArray = completed[3]
@@ -268,7 +302,7 @@ func _send_json_once(
 
     var parsed = JSON.parse_string(text)
     if typeof(parsed) != TYPE_DICTIONARY:
-        _set_error(Util.ERROR_INTERNAL, "invalid response body for " + service + "/" + method)
+        _set_error(Util.ERROR_INTERNAL, "invalid response body for " + operation)
         return null
 
     _clear_error()
@@ -276,19 +310,29 @@ func _send_json_once(
 
 
 func _build_headers(method: String, requires_auth: bool) -> PackedStringArray:
-    var headers := PackedStringArray([
-        "Content-Type: application/json",
-        "Accept: application/json"
-    ])
+    var headers := _json_headers()
     if not requires_auth:
         return headers
 
-    headers.append("Authorization: Bearer " + api_key)
-    if not language.is_empty():
-        headers.append("X-Hive-Ng-Language: " + language)
+    headers = _build_api_key_headers()
     if _session.has_access_token() and _uses_player_token(method):
         headers.append("X-Player-Token: " + _session.access_token)
     return headers
+
+
+func _build_api_key_headers() -> PackedStringArray:
+    var headers := _json_headers()
+    headers.append("Authorization: Bearer " + api_key)
+    if not language.is_empty():
+        headers.append("X-Hive-Ng-Language: " + language)
+    return headers
+
+
+func _json_headers() -> PackedStringArray:
+    return PackedStringArray([
+        "Content-Type: application/json",
+        "Accept: application/json"
+    ])
 
 
 func _uses_player_token(method: String) -> bool:
@@ -306,7 +350,9 @@ func _set_http_error(response_code: int, body: String) -> void:
         return
 
     var detail := Util.decode_error_detail(envelope)
-    var code := str(detail.get("code", Util.ERROR_UNSPECIFIED))
+    var code := str(envelope.get("code", ""))
+    if not code.begins_with("ERROR_CODE_"):
+        code = str(detail.get("code", Util.ERROR_UNSPECIFIED))
     var metadata: Dictionary = detail.get("metadata", {})
     var message := str(envelope.get("message", "HTTP " + str(response_code)))
     _set_error(code, message, metadata, response_code)

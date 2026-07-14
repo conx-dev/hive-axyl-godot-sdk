@@ -4,6 +4,7 @@ extends RefCounted
 const Util := preload("res://addons/hive_axyl/hive_axyl_util.gd")
 const GoogleDesktopSignIn := preload("res://addons/hive_axyl/hive_axyl_google_desktop_sign_in.gd")
 const FacebookDesktopSignIn := preload("res://addons/hive_axyl/hive_axyl_facebook_desktop_sign_in.gd")
+const AppleDesktopSignIn := preload("res://addons/hive_axyl/hive_axyl_apple_desktop_sign_in.gd")
 
 var hive
 var _client_platform := ""
@@ -51,6 +52,13 @@ func login_with_facebook(access_token: String) -> Dictionary:
         hive._set_error(Util.ERROR_INVALID_ARGUMENT, "accessToken is required")
         return {}
     return await _login(Util.IDENTITY_PROVIDER_FACEBOOK, access_token)
+
+
+func login_with_apple(identity_token: String) -> Dictionary:
+    if identity_token.is_empty():
+        hive._set_error(Util.ERROR_INVALID_ARGUMENT, "identityToken is required")
+        return {}
+    return await _login(Util.IDENTITY_PROVIDER_APPLE, identity_token)
 
 
 func login_with_google_desktop(client_id: String = "", client_secret: String = "", port: int = 0) -> Dictionary:
@@ -116,6 +124,39 @@ func login_with_facebook_desktop(port: int = 0) -> Dictionary:
         )
         return {}
     return _save_login(response)
+
+
+func login_with_apple_desktop(client_id: String, port: int = 0) -> Dictionary:
+    if not _is_desktop_platform():
+        hive._set_error(
+            Util.ERROR_FAILED_PRECONDITION,
+            "Apple desktop sign-in is only available on desktop"
+        )
+        return {}
+
+    var resolved_client_id := client_id.strip_edges()
+    if resolved_client_id.is_empty():
+        hive._set_error(Util.ERROR_INVALID_ARGUMENT, "Apple Services ID is required")
+        return {}
+
+    var sign_in := AppleDesktopSignIn.new()
+    hive.add_child(sign_in)
+    var response = await sign_in.sign_in(hive, resolved_client_id, port)
+    sign_in.queue_free()
+
+    if typeof(response) != TYPE_DICTIONARY:
+        hive._set_error(Util.ERROR_INTERNAL, "Apple sign-in failed")
+        return {}
+    if response.is_empty():
+        return {}
+    if response.has("error"):
+        hive._set_error(
+            str(response.get("code", Util.ERROR_INTERNAL)),
+            str(response.get("error", "Apple sign-in failed")),
+            response.get("metadata", {})
+        )
+        return {}
+    return await _save_apple_login(response)
 
 
 func login_as_guest(device_id: String) -> Dictionary:
@@ -209,3 +250,23 @@ func _save_login(response: Dictionary) -> Dictionary:
     _player = Util.map_player(player_message)
     hive.session_changed.emit(_player)
     return _player
+
+
+func _save_apple_login(response: Dictionary) -> Dictionary:
+    var access_token := str(response.get("access_token", ""))
+    var refresh_token := str(response.get("refresh_token", ""))
+    if access_token.is_empty() or refresh_token.is_empty():
+        hive._set_error(Util.ERROR_INTERNAL, "Apple login response missing token pair")
+        return {}
+
+    hive.current_session().save_tokens({
+        "accessToken": access_token,
+        "refreshToken": refresh_token,
+        "accessTokenExpiresAt": str(response.get("access_token_expires_at", "")),
+        "playerValidationToken": str(response.get("player_validation_token", "")),
+        "playerValidationTokenExpiresAt": str(response.get("player_validation_token_expires_at", ""))
+    })
+    var restored: Dictionary = await restore_session()
+    if restored.is_empty() and hive.last_error.is_empty():
+        hive._set_error(Util.ERROR_INTERNAL, "Apple login response missing player")
+    return restored

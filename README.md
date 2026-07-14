@@ -8,7 +8,7 @@ Hive Axyl Godot SDK is a Godot 4.x GDScript addon for game clients. It provides 
 - GDScript
 - Desktop, Android, iOS, or Web export targets
 
-The built-in Google and Facebook browser helpers are available only on Desktop. Android, iOS, and Web games obtain provider tokens through their platform bridge and pass them to the direct login APIs.
+The built-in Google, Facebook, and Apple browser helpers are available only on Desktop. Android, iOS, and Web games obtain provider tokens through their platform bridge and pass them to the direct login APIs.
 
 Payments and push APIs are not included in this release. Payment support is planned separately for Steam integration.
 
@@ -89,24 +89,28 @@ Supported auth entry points:
 - `hive.auth.login_as_guest(device_id)`
 - `hive.auth.login_with_google(id_token)`
 - `hive.auth.login_with_facebook(access_token)`
+- `hive.auth.login_with_apple(identity_token)`
 - `hive.auth.login_with_google_desktop()`
 - `hive.auth.login_with_facebook_desktop()`
+- `hive.auth.login_with_apple_desktop(client_id)`
 - `hive.auth.restore_session()`
 - `hive.auth.logout()`
 - `hive.auth.current_player()`
 
 Direct provider login accepts OAuth tokens obtained by your game through platform provider SDKs and sends them to the Hive Axyl server for validation.
 
-| Export target | Guest | Google | Facebook |
-| --- | --- | --- | --- |
-| Desktop | Direct API | Direct ID token or built-in Desktop OAuth | Direct access token or built-in Desktop OAuth |
-| Android | Direct API | Platform bridge ID token | Platform bridge access token |
-| iOS | Direct API | Platform bridge ID token | Platform bridge access token |
-| Web | Direct API | JavaScript bridge ID token | JavaScript bridge access token |
+| Export target | Guest | Google | Facebook | Apple |
+| --- | --- | --- | --- | --- |
+| Desktop | Direct API | Direct ID token or built-in Desktop OAuth | Direct access token or built-in Desktop OAuth | Direct identity token or built-in Desktop OAuth |
+| Android | Direct API | Platform bridge ID token | Platform bridge access token | Platform bridge identity token |
+| iOS | Direct API | Platform bridge ID token | Platform bridge access token | Platform bridge identity token |
+| Web | Direct API | JavaScript bridge ID token | JavaScript bridge access token | JavaScript bridge identity token |
 
 Provider availability still follows the project, country, and platform configuration returned by `get_login_providers()`.
 
-`login_with_google_desktop()` and `login_with_facebook_desktop()` are Desktop-only. They fail with `ERROR_CODE_FAILED_PRECONDITION` on Android, iOS, and Web before opening a browser or loopback listener. The Facebook helper receives a short-lived one-time completion code through `127.0.0.1`; the Facebook App ID and App Secret stay in the Hive Axyl console and server.
+`login_with_google_desktop()`, `login_with_facebook_desktop()`, and `login_with_apple_desktop()` are Desktop-only. They fail with `ERROR_CODE_FAILED_PRECONDITION` on Android, iOS, and Web before opening a browser or loopback listener. The Facebook helper receives a short-lived one-time completion code through `127.0.0.1`; the Facebook App ID and App Secret stay in the Hive Axyl console and server.
+
+For Apple Desktop login, pass the Services ID registered in the Hive Axyl console. Register the HTTPS Apple Redirect URI shown in the console as the Services ID Return URL in Apple Developer. The `127.0.0.1` callback is internal to the SDK and is not registered with Apple.
 
 For Android exports, enable the `INTERNET` permission. Web exports must be served over HTTPS when calling HTTPS Hive Axyl endpoints, and those endpoints must allow the deployed origin through CORS. Check `OS.is_userfs_persistent()` before relying on persisted `user://` sessions in Web builds.
 
