@@ -86,7 +86,7 @@ var providers := await hive.auth.get_login_providers()
 
 Supported auth entry points:
 
-- `hive.auth.login_as_guest(device_id)`
+- `hive.auth.login_as_guest()`
 - `hive.auth.login_with_google(id_token)`
 - `hive.auth.login_with_facebook(access_token)`
 - `hive.auth.login_with_apple(identity_token)`
@@ -114,6 +114,8 @@ For Apple Desktop login, pass the Services ID registered in the Hive Axyl consol
 
 For Android exports, enable the `INTERNET` permission. Web exports must be served over HTTPS when calling HTTPS Hive Axyl endpoints, and those endpoints must allow the deployed origin through CORS. Check `OS.is_userfs_persistent()` before relying on persisted `user://` sessions in Web builds.
 
+On the first guest login, the SDK creates a cryptographically random installation credential in `user://`. It is stored separately from session tokens, remains after `logout()`, and is unaffected by `persist_session`. Identity-provider login neither creates nor uses it. Guest login fails before sending a request when durable storage is unavailable. Clearing player data can create a new guest account, and the previous guest account may not be recoverable.
+
 ## Notices and Mailbox
 
 After `initialize()`, the same client exposes:
@@ -126,7 +128,7 @@ After `initialize()`, the same client exposes:
 APIs return dictionaries or `null`/`false` on failure. The latest structured error is available through `hive.last_error`, and `HiveAxyl.error_occurred` is emitted when errors are recorded.
 
 ```gdscript
-var player := await hive.auth.login_as_guest(device_id)
+var player := await hive.auth.login_as_guest()
 if player.is_empty():
     var error := hive.last_error
     if error.get("code", "") == "PLAYER_BANNED":

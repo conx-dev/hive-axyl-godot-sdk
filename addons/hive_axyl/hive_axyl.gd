@@ -5,6 +5,7 @@ const AuthApi := preload("res://addons/hive_axyl/hive_axyl_auth.gd")
 const NoticeApi := preload("res://addons/hive_axyl/hive_axyl_notice.gd")
 const MailboxApi := preload("res://addons/hive_axyl/hive_axyl_mailbox.gd")
 const SessionStore := preload("res://addons/hive_axyl/hive_axyl_session.gd")
+const GuestInstallation := preload("res://addons/hive_axyl/hive_axyl_guest_installation.gd")
 const Util := preload("res://addons/hive_axyl/hive_axyl_util.gd")
 const DEFAULT_GATEWAY_URL := "https://gw-test-gcl.c2xstation.net:8081"
 
@@ -25,6 +26,7 @@ var google_client_id := ""
 var google_client_secret := ""
 
 var _session := SessionStore.new()
+var _guest_installation := GuestInstallation.new()
 var _endpoints := {}
 var _ready := false
 
@@ -124,6 +126,16 @@ func clear_session() -> void:
     _session.clear()
     auth.clear_player()
     session_changed.emit({})
+
+
+func _guest_installation_credential() -> String:
+    var credential := _guest_installation.get_or_create_credential()
+    if credential.is_empty():
+        _set_error(
+            Util.ERROR_FAILED_PRECONDITION,
+            "Guest login requires persistent app storage and secure randomness"
+        )
+    return credential
 
 
 func _rpc(domain: String, service: String, method: String, body: Dictionary, allows_session_refresh: bool) -> Variant:

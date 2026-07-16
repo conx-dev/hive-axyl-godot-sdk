@@ -159,11 +159,11 @@ func login_with_apple_desktop(client_id: String, port: int = 0) -> Dictionary:
     return await _save_apple_login(response)
 
 
-func login_as_guest(device_id: String) -> Dictionary:
-    if device_id.is_empty():
-        hive._set_error(Util.ERROR_INVALID_ARGUMENT, "deviceId is required")
+func login_as_guest() -> Dictionary:
+    var credential := hive._guest_installation_credential()
+    if credential.is_empty():
         return {}
-    return await _login(Util.IDENTITY_PROVIDER_GUEST, device_id)
+    return await _login(Util.IDENTITY_PROVIDER_GUEST, credential)
 
 
 func restore_session() -> Dictionary:
