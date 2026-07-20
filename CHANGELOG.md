@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.0
+
+- Changed `login_as_guest(device_id)` to `login_as_guest()` and use an SDK-generated installation credential.
+- Persisted the guest installation credential across logout without affecting identity-provider login.
+
 ## 0.3.0
 
 - Added direct Apple identity-token login for Android, iOS, Web, and Desktop bridges.
